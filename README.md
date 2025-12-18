@@ -2,21 +2,6 @@
 
 A complete authentication system using **Ory Kratos** with **GitLab OAuth (OIDC)**, featuring a Node.js/Express backend with application-level role-based access control (RBAC).
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        Browser (127.0.0.1)                              │
-│                                                                         │
-│   Auth UI (4455)  ←→  Kratos Public (4433)  ←→  GitLab OIDC            │
-│         ↓                      ↓                                        │
-│   App Backend (3000) ←────────→                                         │
-│         ↓                      ↓                                        │
-│   PostgreSQL (5432)   ←   Kratos Store                                  │
-│   (App DB: roles)         (Identity DB)                                 │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
 ### Component Responsibilities
 
 | Component | Owns | Does NOT Own |
@@ -50,7 +35,7 @@ cp .env.example .env
 4. Fill in the details:
    - **Name**: `Kratos OAuth Dev` (or any name)
    - **Redirect URI**: `http://127.0.0.1:4433/self-service/methods/oidc/callback/gitlab`
-   - **Confidential**: ✅ Yes (checked)
+   - **Confidential**: Yes (checked)
    - **Scopes**: Select `openid`, `profile`, `email`
 5. Click **Save application**
 6. Copy the **Application ID** and **Secret**
