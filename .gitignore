@@ -1,0 +1,114 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+dist/
+build/
+*.js.map
+
+# App build artifacts
+app/dist/
+app/build/
+app/.next/
+app/out/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# Cursor AI (keep plans but ignore temp files)
+.cursor/.cursorrules
+.cursor/chat/
+.cursor/mcp.json
+
+# Docker
+.dockerignore
+
+# PostgreSQL
+*.sql.backup
+pg_data/
+postgres_data/
+
+# Testing
+coverage/
+*.coverage
+.nyc_output/
+.cache/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Package manager lock files (optional - uncomment if you want to ignore)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Local development
+.local/
+*.local
+
+# Certificates and keys (if any)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Secrets (additional safety)
+secrets/
+*.secret
+credentials.json
+
+# Kratos runtime data (if mounted locally)
+kratos/data/
+
+# MailSlurper data
+mailslurper/data/
+
+# Misc
+.npm/
+.eslintcache
+.stylelintcache
