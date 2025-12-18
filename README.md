@@ -1,5 +1,10 @@
 # Ory Kratos GitLab OAuth App
 
+![WhatsApp Image 2025-12-16 at 14 17 31](https://github.com/user-attachments/assets/78200ab2-350e-4717-9b77-d60f65c77a52)
+![WhatsApp Image 2025-12-16 at 14 17 52](https://github.com/user-attachments/assets/790db16e-ebbb-477c-936a-38d9e8b6ecdb)
+
+
+
 A complete authentication system using **Ory Kratos** with **GitLab OAuth (OIDC)**, featuring a Node.js/Express backend with application-level role-based access control (RBAC).
 
 ### Component Responsibilities
