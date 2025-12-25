@@ -1,10 +1,7 @@
 # Ory Kratos OAuth + Role-Based Markdown CMS
 
-<<<<<<< HEAD
-![WhatsApp Image 2025-12-16 at 14 17 31](https://github.com/user-attachments/assets/78200ab2-350e-4717-9b77-d60f65c77a52)
-![WhatsApp Image 2025-12-16 at 14 17 52](https://github.com/user-attachments/assets/790db16e-ebbb-477c-936a-38d9e8b6ecdb)
-
-
+<img width="561" height="387" alt="image" src="https://github.com/user-attachments/assets/3c3603fc-72ba-48f1-93af-76454c696011" />
+<img width="586" height="422" alt="image" src="https://github.com/user-attachments/assets/1d5177b8-1a63-489e-b36c-ea8bd57696b1" />
 
 A complete authentication system using **Ory Kratos** with **GitLab OAuth (OIDC)**, featuring a Node.js/Express backend with application-level role-based access control (RBAC).
 
@@ -16,8 +13,7 @@ A complete authentication system using **Ory Kratos** with **GitLab OAuth (OIDC)
 | **Application** | Role management, Authorization, Business logic | Authentication, Session tokens |
 | **Kratos UI** | Login, Registration, Settings, Recovery UI | Role-based UI |
 =======
-Authentication system with GitLab/Google OAuth, role-based access control, and markdown page management.
->>>>>>> a3f4646 (feat: Implement Pages Data Access Layer with role-based access control)
+Authentication system with GitLab/Google OAuth, role-based access control, and markdown page management.oc
 
 ## Prerequisites
 
