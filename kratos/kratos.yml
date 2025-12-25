@@ -54,6 +54,16 @@ selfservice:
               - openid
               - profile
               - email
+          - id: google
+            provider: google
+            client_id: ""  # Set via environment variable SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_1_CLIENT_ID
+            client_secret: ""  # Set via environment variable SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_1_CLIENT_SECRET
+            issuer_url: https://accounts.google.com
+            mapper_url: file:///etc/config/kratos/oidc.google.jsonnet
+            scope:
+              - openid
+              - profile
+              - email
 
   flows:
     error:

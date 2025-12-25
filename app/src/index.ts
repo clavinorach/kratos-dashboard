@@ -8,6 +8,7 @@ import { pool } from './db/client';
 import meRoutes from './routes/me';
 import adminRoutes from './routes/admin';
 import appRoutes from './routes/app';
+import pagesRoutes from './routes/pages';
 
 const app = express();
 
@@ -36,6 +37,9 @@ app.use('/admin', adminRoutes);
 
 // App Routes (HTML)
 app.use('/app', appRoutes);
+
+// Pages Routes (Public with role-based access)
+app.use(pagesRoutes);
 
 // Logout route
 app.get('/logout', async (req, res) => {

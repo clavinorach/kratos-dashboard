@@ -1,5 +1,6 @@
-# Ory Kratos GitLab OAuth App
+# Ory Kratos OAuth + Role-Based Markdown CMS
 
+<<<<<<< HEAD
 ![WhatsApp Image 2025-12-16 at 14 17 31](https://github.com/user-attachments/assets/78200ab2-350e-4717-9b77-d60f65c77a52)
 ![WhatsApp Image 2025-12-16 at 14 17 52](https://github.com/user-attachments/assets/790db16e-ebbb-477c-936a-38d9e8b6ecdb)
 
@@ -14,363 +15,263 @@ A complete authentication system using **Ory Kratos** with **GitLab OAuth (OIDC)
 | **Ory Kratos** | Identity storage, Sessions, GitLab OIDC flows, Email verification | Roles, Permissions |
 | **Application** | Role management, Authorization, Business logic | Authentication, Session tokens |
 | **Kratos UI** | Login, Registration, Settings, Recovery UI | Role-based UI |
+=======
+Authentication system with GitLab/Google OAuth, role-based access control, and markdown page management.
+>>>>>>> a3f4646 (feat: Implement Pages Data Access Layer with role-based access control)
 
 ## Prerequisites
 
 - Docker & Docker Compose
-- GitLab account (for creating OAuth Application)
-- Node.js 20+ (for local development without Docker)
+
+## OAuth Configuration
+
+### GitLab OAuth Application
+
+1. Go to **GitLab** → **User Settings** → **Applications**
+2. Create new application with:
+   - **Redirect URI**: `http://127.0.0.1:4433/self-service/methods/oidc/callback/gitlab`
+   - **Scopes**: `openid`, `profile`, `email`
+3. Copy **Application ID** and **Secret**
+
+### Google OAuth Application
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
+2. Create **OAuth 2.0 Client ID** with:
+   - **Application type**: Web application
+   - **Authorized redirect URI**: `http://127.0.0.1:4433/self-service/methods/oidc/callback/google`
+3. Copy **Client ID** and **Client Secret**
+
+### Environment Variables
+
+Create `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+
+```bash
+# GitLab OAuth
+GITLAB_CLIENT_ID=your_gitlab_application_id
+GITLAB_CLIENT_SECRET=your_gitlab_secret
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# Database
+POSTGRES_PASSWORD=secret
+KRATOS_DSN=postgres://postgres:secret@postgres:5432/kratos?sslmode=disable
+APP_DATABASE_URL=postgres://postgres:secret@postgres:5432/app?sslmode=disable
+
+# Secrets (change in production)
+KRATOS_SECRETS_COOKIE=PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+KRATOS_SECRETS_CIPHER=32-LONG-SECRET-NOT-SECURE-AT-ALL
+SESSION_SECRET=change-this-super-secret-session-key
+```
 
 ## Quick Start
 
-### 1. Clone and Configure
-
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your GitLab OAuth credentials (see GitLab OAuth Setup below)
-```
-
-### 2. Create GitLab OAuth Application
-
-1. Go to **GitLab** → **User Settings** (click your avatar → Edit profile)
-2. Navigate to **Applications** in the left sidebar
-3. Click **Add new application**
-4. Fill in the details:
-   - **Name**: `Kratos OAuth Dev` (or any name)
-   - **Redirect URI**: `http://127.0.0.1:4433/self-service/methods/oidc/callback/gitlab`
-   - **Confidential**: Yes (checked)
-   - **Scopes**: Select `openid`, `profile`, `email`
-5. Click **Save application**
-6. Copy the **Application ID** and **Secret**
-7. Add to your `.env` file:
-   ```
-   GITLAB_CLIENT_ID=your_application_id_here
-   GITLAB_CLIENT_SECRET=your_secret_here
-   ```
-
-> **Note**: For self-hosted GitLab instances, you may need to update the `issuer_url` in `kratos/kratos.yml` from `https://gitlab.com` to your GitLab instance URL.
-
-### 3. Start Services
+### 1. Start Services
 
 ```bash
 docker compose up -d
 ```
 
-Wait for all services to be healthy (30-60 seconds on first run).
+Wait 30-60 seconds for all services to initialize.
 
-### 4. Access the Application
+### 2. Initialize Database
 
-- **Application**: http://127.0.0.1:3000
-- **Auth UI (Login/Register)**: http://127.0.0.1:4455
-- **Kratos Public API**: http://127.0.0.1:4433
-- **Kratos Admin API**: http://127.0.0.1:4434
-- **MailSlurper (Email UI)**: http://127.0.0.1:4436
-
-## User Flows
-
-### Registration via GitLab
-
-1. Visit http://127.0.0.1:3000 → redirected to login
-2. Click **Sign up** → **Sign in with GitLab**
-3. Authorize the application on GitLab
-4. Redirected back to app with "Pending Approval" message
-5. Wait for admin to assign a role
-
-### First Admin Setup (Bootstrap)
-
-After registering the first user via GitLab:
+Create the pages table:
 
 ```bash
-# 1. Find the identity ID from Kratos
-docker compose exec postgres psql -U postgres -d kratos -c "SELECT id, traits FROM identities;"
+docker compose exec postgres psql -U postgres -d app << 'EOF'
+CREATE TYPE user_role AS ENUM ('admin', 'user');
 
-# 2. Copy the UUID and promote to admin
+CREATE TABLE IF NOT EXISTS pages (
+    id SERIAL PRIMARY KEY,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    allowed_roles user_role[] NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT pages_slug_format CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$')
+);
+
+CREATE INDEX idx_pages_slug ON pages(slug);
+CREATE INDEX idx_pages_allowed_roles ON pages USING GIN(allowed_roles);
+
+CREATE OR REPLACE FUNCTION update_pages_updated_at()
+RETURNS TRIGGER AS \$\$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+\$\$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_pages_updated_at
+    BEFORE UPDATE ON pages
+    FOR EACH ROW
+    EXECUTE FUNCTION update_pages_updated_at();
+EOF
+```
+
+### 3. Bootstrap First Admin
+
+1. Login via Google or GitLab at http://127.0.0.1:3000
+2. Get your identity ID:
+
+```bash
+docker compose exec postgres psql -U postgres -d kratos -c "SELECT id, traits->>'email' FROM identities;"
+```
+
+3. Promote to admin (replace `YOUR-IDENTITY-UUID`):
+
+```bash
 docker compose exec postgres psql -U postgres -d app -c \
   "INSERT INTO user_roles (identity_id, role) VALUES ('YOUR-IDENTITY-UUID', 'admin') ON CONFLICT (identity_id) DO UPDATE SET role = 'admin';"
 ```
 
-### Login Flow
+4. Refresh browser to see admin dashboard
 
-1. Visit http://127.0.0.1:3000
-2. Click **Sign in with GitLab**
-3. If role assigned → Dashboard
-4. If no role → "Pending Approval" page
+## Service Access Points
+
+| Service | URL |
+|---------|-----|
+| Application | http://127.0.0.1:3000 |
+| Auth UI | http://127.0.0.1:4455 |
+| Kratos Public API | http://127.0.0.1:4433 |
+| Kratos Admin API | http://127.0.0.1:4434 |
+| MailSlurper (Email Testing) | http://127.0.0.1:4436 |
 
 ## API Endpoints
 
-### Public Endpoints
+### Authentication
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/` | GET | Redirect to `/app` |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/me` | GET | Session | Current user info + role |
+| `/logout` | GET | Session | Logout |
 
-### Authenticated Endpoints (Session Required)
+### Page Management
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/me` | GET | Current user info + role |
-| `/app` | GET | Main app (role-based routing) |
-| `/logout` | GET | Initiate logout via Kratos |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/p` | GET | User | List accessible pages |
+| `/p/:slug` | GET | User | View page (role-checked) |
+| `/admin/pages` | GET | Admin | List all pages (JSON) |
+| `/admin/pages/new` | GET | Admin | Page editor (HTML) |
+| `/admin/pages/:id/edit` | GET | Admin | Page editor (HTML) |
+| `/admin/pages` | POST | Admin | Create page |
+| `/admin/pages/:id` | PUT | Admin | Update page |
+| `/admin/pages/:id` | DELETE | Admin | Delete page |
 
-### Admin Endpoints (Admin Role Required)
+### User Management
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/admin/users` | GET | List all users with roles |
-| `/admin/users/:id` | GET | Get specific user |
-| `/admin/users/:id/role` | POST | Assign/update role |
-| `/admin/users/:id/role` | DELETE | Remove role (set to pending) |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/admin/users` | GET | Admin | List all users |
+| `/admin/users/:id/role` | POST | Admin | Assign role |
+| `/admin/users/:id/role` | DELETE | Admin | Remove role |
 
-### Example: Assign Role via API
-
-```bash
-# Get all users
-curl -b cookies.txt http://127.0.0.1:3000/admin/users
-
-# Assign admin role
-curl -X POST http://127.0.0.1:3000/admin/users/{identity_id}/role \
-  -H "Content-Type: application/json" \
-  -b cookies.txt \
-  -d '{"role": "admin"}'
-```
-
-## Database Inspection
-
-### View Kratos Identities
+## Database Access
 
 ```bash
-docker compose exec postgres psql -U postgres -d kratos -c "SELECT id, traits, created_at FROM identities;"
-```
+# View identities
+docker compose exec postgres psql -U postgres -d kratos -c "SELECT id, traits FROM identities;"
 
-### View App Roles
-
-```bash
+# View user roles
 docker compose exec postgres psql -U postgres -d app -c "SELECT * FROM user_roles;"
-```
 
-### Interactive PostgreSQL Session
+# View pages
+docker compose exec postgres psql -U postgres -d app -c "SELECT id, slug, title, allowed_roles FROM pages;"
 
-```bash
-# Kratos database
-docker compose exec postgres psql -U postgres -d kratos
-
-# App database
+# Interactive session
 docker compose exec postgres psql -U postgres -d app
 ```
 
-## Configuration Files
+## Development
 
-### `kratos/kratos.yml`
+### Rebuild and Restart
 
-Main Kratos configuration:
-- GitLab OIDC provider configuration
-- Self-service flow URLs
-- Cookie settings (domain: `127.0.0.1`, SameSite: `Lax`)
-- Session lifespan
-
-### `kratos/identity.schema.json`
-
-Identity traits schema:
-- `email` (required)
-- `name` (full name from GitLab)
-- `picture` (avatar URL)
-
-### `kratos/oidc.gitlab.jsonnet`
-
-Jsonnet mapper for GitLab OIDC claims → Kratos traits:
-
-```jsonnet
-{
-  identity: {
-    traits: {
-      email: claims.email,
-      name: claims.name or claims.nickname or claims.preferred_username,
-      picture: claims.picture,
-    },
-  },
-}
-```
-
-## Troubleshooting
-
-### Cookies Not Working / Session Issues
-
-**Symptom**: Login succeeds but immediately redirects back to login.
-
-**Solution**: 
-- Always use `http://127.0.0.1:PORT` in browser (not `localhost`)
-- Check that cookie domain is `127.0.0.1` in `kratos.yml`
-- Ensure `same_site: Lax` is set
-
-### CORS Errors
-
-**Symptom**: Browser console shows CORS policy errors.
-
-**Solution**:
-- Verify all URLs use `127.0.0.1`
-- Check `kratos.yml` CORS configuration includes your origins
-- Ensure `allow_credentials: true` is set
-
-### GitLab OAuth Callback Error
-
-**Symptom**: Error after GitLab authorization.
-
-**Solution**:
-- Verify redirect URI in GitLab Application: `http://127.0.0.1:4433/self-service/methods/oidc/callback/gitlab`
-- Check `GITLAB_CLIENT_ID` and `GITLAB_CLIENT_SECRET` in `.env`
-- Ensure Kratos container has access to environment variables
-- For self-hosted GitLab: update `issuer_url` in `kratos.yml`
-
-### "Sign in with GitLab" Button Not Showing
-
-**Symptom**: Only password login form appears, no GitLab button.
-
-**Solution**:
-- Verify GitLab provider is configured in `kratos.yml` under `selfservice.methods.oidc.config.providers`
-- Check that `GITLAB_CLIENT_ID` environment variable is set
-- Restart Kratos container: `docker compose restart kratos`
-
-### Database Connection Errors
-
-**Symptom**: App fails to start with database errors.
-
-**Solution**:
 ```bash
-# Check PostgreSQL is running
-docker compose ps postgres
-
-# View logs
-docker compose logs postgres
-
-# Verify databases exist
-docker compose exec postgres psql -U postgres -c "\l"
+docker compose up -d --build
 ```
 
-### Kratos Migration Failed
-
-**Symptom**: Kratos won't start, migration errors in logs.
-
-**Solution**:
-```bash
-# Check migration container logs
-docker compose logs kratos-migrate
-
-# Re-run migrations
-docker compose up -d kratos-migrate
-```
-
-### View Service Logs
+### View Logs
 
 ```bash
 # All services
 docker compose logs -f
 
 # Specific service
-docker compose logs -f kratos
 docker compose logs -f app
+docker compose logs -f kratos
 ```
 
-## Development
-
-### Local Development (without Docker)
+### Reset Everything
 
 ```bash
-cd app
-npm install
-npm run dev
-```
-
-Note: Requires Kratos and PostgreSQL to be running (via Docker Compose).
-
-### Hot Reloading
-
-The app container uses `tsx watch` for automatic hot-reloading during development. Changes to files in `app/src/` and `app/views/` are automatically detected.
-
-### Building the App Image
-
-```bash
-docker compose build app
-```
-
-### Resetting Everything
-
-```bash
-# Stop and remove all containers, volumes, networks
 docker compose down -v
-
-# Start fresh
 docker compose up -d
 ```
 
-## Service Ports Summary
+### Hot Reload
 
-| Service | Port | URL |
-|---------|------|-----|
-| PostgreSQL | 5432 | - |
-| MailSlurper Web | 4436 | http://127.0.0.1:4436 |
-| MailSlurper SMTP | 1025 | - |
-| Kratos Public | 4433 | http://127.0.0.1:4433 |
-| Kratos Admin | 4434 | http://127.0.0.1:4434 |
-| Kratos UI | 4455 | http://127.0.0.1:4455 |
-| App Backend | 3000 | http://127.0.0.1:3000 |
+The app container uses `tsx watch` - changes to `app/src/` and `app/views/` auto-reload.
 
-## File Structure
+## Common Tasks
 
-```
-ory-kratos-oauth/
-├── docker-compose.yml          # Service orchestration
-├── .env.example                 # Environment template
-├── README.md                    # This file
-├── kratos/
-│   ├── kratos.yml              # Kratos configuration (GitLab OIDC)
-│   ├── identity.schema.json    # Identity traits schema
-│   └── oidc.gitlab.jsonnet     # GitLab OAuth mapper
-├── app/
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── Dockerfile
-│   ├── src/
-│   │   ├── index.ts            # Express entry point
-│   │   ├── config.ts           # Configuration
-│   │   ├── middleware/
-│   │   │   ├── auth.ts         # Session validation
-│   │   │   └── requireRole.ts  # RBAC middleware
-│   │   ├── routes/
-│   │   │   ├── me.ts           # /me endpoint
-│   │   │   ├── admin.ts        # /admin/* endpoints
-│   │   │   └── app.ts          # /app endpoint
-│   │   ├── services/
-│   │   │   └── kratos.ts       # Kratos SDK wrapper
-│   │   └── db/
-│   │       ├── client.ts       # PostgreSQL client
-│   │       └── migrations/     # SQL migrations
-│   └── views/
-│       ├── pending.ejs         # Pending approval page
-│       ├── dashboard.ejs       # User dashboard
-│       └── admin.ejs           # Admin dashboard
-└── scripts/
-    ├── init-multiple-dbs.sh    # Database initialization
-    └── seed-admin.sql          # Admin bootstrap script
+### Create a Page
+
+1. Login as admin
+2. Navigate to `/admin/pages/new`
+3. Fill in title, slug, markdown content, and allowed roles
+4. Submit form
+
+Example markdown content:
+
+```markdown
+# Welcome
+
+This is a **secure** markdown page with:
+- Role-based access control
+- XSS protection
+- Beautiful rendering
+
+## Code Example
+
+`const x = 42;`
 ```
 
-## Self-Hosted GitLab Configuration
+### Assign User Role
 
-If you're using a self-hosted GitLab instance, update the `issuer_url` in `kratos/kratos.yml`:
+```bash
+# Via API (replace {identity_id} and {role})
+curl -X POST http://127.0.0.1:3000/admin/users/{identity_id}/role \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{"role": "admin"}'
 
-```yaml
-selfservice:
-  methods:
-    oidc:
-      config:
-        providers:
-          - id: gitlab
-            provider: gitlab
-            issuer_url: https://your-gitlab-instance.com  # Change this
-            # ... rest of config
+# Via database
+docker compose exec postgres psql -U postgres -d app -c \
+  "INSERT INTO user_roles (identity_id, role) VALUES ('{identity_id}', 'user');"
 ```
+
+### View Email Verification Links
+
+Visit http://127.0.0.1:4436 to see emails sent by Kratos (MailSlurper UI).
+
+## Production Deployment
+
+1. Change all secrets in `.env`
+2. Use HTTPS for all OAuth redirect URIs
+3. Update callback URLs in GitLab/Google consoles
+4. Set proper cookie domain in `kratos/kratos.yml`
+5. Use managed PostgreSQL
+6. Enable SSL for database connections
 
 ## License
 
