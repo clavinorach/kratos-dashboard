@@ -1,151 +1,46 @@
 version: v1.1.0
 
-# Development mode
-dev: true
-
 dsn: memory
 
 serve:
+
   public:
-    base_url: http://127.0.0.1:4433/
-    cors:
-      enabled: true
-      allowed_origins:
-        - http://127.0.0.1:3000
-        - http://127.0.0.1:4455
-      allowed_methods:
-        - POST
-        - GET
-        - PUT
-        - PATCH
-        - DELETE
-      allowed_headers:
-        - Authorization
-        - Cookie
-        - Content-Type
-        - X-Session-Token
-      exposed_headers:
-        - Content-Type
-        - Set-Cookie
-      allow_credentials: true
+    # This will be overridden by the SERVE_PUBLIC_BASE_URL environment variable in Docker
+    base_url: http://127.0.0.1:4433/ 
   admin:
     base_url: http://kratos:4434/
+    
+courier:
+  smtp:
+    connection_uri: smtp://test:test@mailslurper:1025/?skip_ssl_verify=true
 
 selfservice:
-  default_browser_return_url: http://127.0.0.1:3000/app
-  allowed_return_urls:
-    - http://127.0.0.1:3000
-    - http://127.0.0.1:4455
-
   methods:
     password:
-      enabled: false
+      enabled: true # Enable standard email/password authentication
     oidc:
-      enabled: true
+      enabled: true # Enable Social Login (OAuth2/OpenID Connect)
       config:
         providers:
           - id: gitlab
             provider: gitlab
-            client_id: ""  # Set via environment variable SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID
-            client_secret: ""  # Set via environment variable SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET
-            issuer_url: https://gitlab.com
             mapper_url: file:///etc/config/kratos/oidc.gitlab.jsonnet
+            # Credentials (Client ID/Secret) are injected via Environment Variables
             scope:
               - openid
               - profile
               - email
           - id: google
             provider: google
-            client_id: ""  # Set via environment variable SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_1_CLIENT_ID
-            client_secret: ""  # Set via environment variable SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_1_CLIENT_SECRET
-            issuer_url: https://accounts.google.com
             mapper_url: file:///etc/config/kratos/oidc.google.jsonnet
+            # Credentials (Client ID/Secret) are injected via Environment Variables
             scope:
               - openid
               - profile
               - email
-
-  flows:
-    error:
-      ui_url: http://127.0.0.1:4455/error
-
-    settings:
-      ui_url: http://127.0.0.1:4455/settings
-      privileged_session_max_age: 15m
-      required_aal: highest_available
-
-    recovery:
-      enabled: true
-      ui_url: http://127.0.0.1:4455/recovery
-      use: code
-
-    verification:
-      enabled: true
-      ui_url: http://127.0.0.1:4455/verification
-      use: code
-      after:
-        default_browser_return_url: http://127.0.0.1:3000/app
-
-    logout:
-      after:
-        default_browser_return_url: http://127.0.0.1:4455/login
-
-    login:
-      ui_url: http://127.0.0.1:4455/login
-      lifespan: 10m
-      after:
-        default_browser_return_url: http://127.0.0.1:3000/app
-        oidc:
-          hooks:
-            - hook: revoke_active_sessions
-
-    registration:
-      enabled: true
-      ui_url: http://127.0.0.1:4455/registration
-      lifespan: 10m
-      after:
-        default_browser_return_url: http://127.0.0.1:3000/app
-        oidc:
-          hooks:
-            - hook: session
-
-log:
-  level: debug
-  format: text
-  leak_sensitive_values: true
-
-secrets:
-  cookie:
-    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
-  cipher:
-    - 32-LONG-SECRET-NOT-SECURE-AT-ALL
-
-ciphers:
-  algorithm: xchacha20-poly1305
-
-hashers:
-  algorithm: bcrypt
-  bcrypt:
-    cost: 8
 
 identity:
   default_schema_id: default
   schemas:
     - id: default
       url: file:///etc/config/kratos/identity.schema.json
-
-courier:
-  smtp:
-    connection_uri: smtps://test:test@mailslurper:1025/?skip_ssl_verify=true
-
-session:
-  lifespan: 24h
-  cookie:
-    domain: 127.0.0.1
-    same_site: Lax
-    name: ory_kratos_session
-
-cookies:
-  domain: 127.0.0.1
-  same_site: Lax
-  path: /

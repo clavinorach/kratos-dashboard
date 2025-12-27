@@ -1,12 +1,10 @@
-version: "3.8"
-
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_MULTIPLE_DATABASES: kratos,app
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -21,21 +19,21 @@ services:
     networks:
       - kratos-network
 
-  # MailSlurper - Fake SMTP for development
+  # MailSlurper - Email Testing
   mailslurper:
     image: oryd/mailslurper:latest-smtps
     ports:
-      - "4436:4436"  # Web UI
-      - "4437:4437"  # API
-      - "1025:1025"  # SMTP
+      - "4436:4436"
+      - "4437:4437"
+      - "1025:1025"
     networks:
       - kratos-network
 
-  # Kratos Migration
+  # Kratos Database Migration
   kratos-migrate:
     image: oryd/kratos:v1.1.0
     environment:
-      DSN: ${KRATOS_DSN:-postgres://postgres:secret@postgres:5432/kratos?sslmode=disable}
+      DSN: ${KRATOS_DSN}
     volumes:
       - ./kratos:/etc/config/kratos:ro
     command: migrate sql -e --yes
@@ -45,42 +43,76 @@ services:
     networks:
       - kratos-network
 
-  # Ory Kratos
+  # Ory Kratos Authentication Service
   kratos:
     image: oryd/kratos:v1.1.0
     environment:
-      DSN: ${KRATOS_DSN:-postgres://postgres:secret@postgres:5432/kratos?sslmode=disable}
-      SECRETS_COOKIE: ${KRATOS_SECRETS_COOKIE:-PLEASE-CHANGE-ME-I-AM-VERY-INSECURE}
-      SECRETS_CIPHER: ${KRATOS_SECRETS_CIPHER:-32-LONG-SECRET-NOT-SECURE-AT-ALL}
+      # Database
+      DSN: ${KRATOS_DSN}
+      SECRETS_COOKIE: ${KRATOS_SECRETS_COOKIE}
+      SECRETS_CIPHER: ${KRATOS_SECRETS_CIPHER}
+      
+      # Server Configuration
+      SERVE_PUBLIC_HOST: "0.0.0.0"
+      SERVE_ADMIN_HOST: "0.0.0.0"
+      SERVE_PUBLIC_PORT: "4433"
+      SERVE_ADMIN_PORT: "4434"
+      
+      # OIDC Providers
       SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID: ${GITLAB_CLIENT_ID}
       SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET: ${GITLAB_CLIENT_SECRET}
       SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_1_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_1_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      
+      # Network Overrides
+      SERVE_PUBLIC_BASE_URL: ${KRATOS_BROWSER_URL}/
+      SERVE_ADMIN_BASE_URL: ${KRATOS_ADMIN_URL_INTERNAL}/
+      
+      # Redirects
+      SELFSERVICE_DEFAULT_BROWSER_RETURN_URL: ${APP_URL}/
+      SELFSERVICE_ALLOWED_RETURN_URLS_0: ${APP_URL}/
+      SELFSERVICE_ALLOWED_RETURN_URLS_1: ${KRATOS_UI_URL}/
+      
+      # UI Flow URLs
+      SELFSERVICE_FLOWS_LOGIN_UI_URL: ${KRATOS_UI_URL}/login
+      SELFSERVICE_FLOWS_REGISTRATION_UI_URL: ${KRATOS_UI_URL}/registration
+      SELFSERVICE_FLOWS_RECOVERY_UI_URL: ${KRATOS_UI_URL}/recovery
+      SELFSERVICE_FLOWS_VERIFICATION_UI_URL: ${KRATOS_UI_URL}/verification
+      SELFSERVICE_FLOWS_SETTINGS_UI_URL: ${KRATOS_UI_URL}/settings
+      SELFSERVICE_FLOWS_ERROR_UI_URL: ${KRATOS_UI_URL}/error
+      
+      # CORS Configuration
+      SERVE_PUBLIC_CORS_ENABLED: "true"
+      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS_0: ${APP_URL}
+      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS_1: ${KRATOS_UI_URL}
+      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS_2: ${KRATOS_BROWSER_URL}
+      
+      # Authentication Cookies
+      SESSION_COOKIE_DOMAIN: ${DOMAIN}
+      SESSION_COOKIE_SAME_SITE: Lax
     volumes:
       - ./kratos:/etc/config/kratos:ro
     command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
     ports:
-      - "4433:4433"  # Public API
-      - "4434:4434"  # Admin API
+      - "4433:4433"
+      - "4434:4434"
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
-      mailslurper:
-        condition: service_started
     networks:
       - kratos-network
 
-  # Kratos Self-Service UI (Node.js)
+  # Kratos Self-Service UI
   kratos-selfservice-ui-node:
     image: oryd/kratos-selfservice-ui-node:v1.1.0
     environment:
       PORT: 4455
-      SECURITY_MODE: ""
-      KRATOS_PUBLIC_URL: http://kratos:4433
-      KRATOS_BROWSER_URL: http://127.0.0.1:4433
-      COOKIE_SECRET: ${SESSION_SECRET:-change-this-super-secret-session-key}
-      CSRF_COOKIE_NAME: __HOST-csrf
-      CSRF_COOKIE_SECRET: ${SESSION_SECRET:-change-this-super-secret-session-key}
+      KRATOS_PUBLIC_URL: ${KRATOS_PUBLIC_URL_INTERNAL}
+      KRATOS_ADMIN_URL: ${KRATOS_ADMIN_URL_INTERNAL}
+      KRATOS_BROWSER_URL: ${KRATOS_BROWSER_URL}
+      COOKIE_SECRET: ${SESSION_SECRET}
+      CSRF_COOKIE_NAME: ory_csrf_ui
+      CSRF_COOKIE_SECRET: ${SESSION_SECRET}
     ports:
       - "4455:4455"
     depends_on:
@@ -88,7 +120,7 @@ services:
     networks:
       - kratos-network
 
-  # Application Backend with hot-reload
+  # Application Backend
   app:
     build:
       context: ./app
@@ -96,12 +128,13 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: ${APP_DATABASE_URL:-postgres://postgres:secret@postgres:5432/app?sslmode=disable}
-      KRATOS_PUBLIC_URL: http://kratos:4433
-      KRATOS_ADMIN_URL: http://kratos:4434
-      KRATOS_BROWSER_URL: http://127.0.0.1:4433
-      APP_URL: http://127.0.0.1:3000
-      SESSION_SECRET: ${SESSION_SECRET:-change-this-super-secret-session-key}
+      DATABASE_URL: ${APP_DATABASE_URL}
+      KRATOS_PUBLIC_URL: ${KRATOS_PUBLIC_URL_INTERNAL}
+      KRATOS_ADMIN_URL: ${KRATOS_ADMIN_URL_INTERNAL}
+      KRATOS_BROWSER_URL: ${KRATOS_BROWSER_URL}
+      KRATOS_UI_URL: ${KRATOS_UI_URL}
+      APP_URL: ${APP_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
     ports:
       - "3000:3000"
     volumes:

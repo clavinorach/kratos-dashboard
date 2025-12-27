@@ -17,7 +17,6 @@ A complete authentication system using **Ory Kratos** with **GitLab OAuth (OIDC)
 | **Kratos UI** | Login, Registration, Settings, Recovery UI | Role-based UI |
 =======
 Authentication system with GitLab/Google OAuth, role-based access control, and markdown page management.
->>>>>>> a3f4646 (feat: Implement Pages Data Access Layer with role-based access control)
 
 ## Prerequisites
 
@@ -49,27 +48,7 @@ Create `.env` file:
 cp .env.example .env
 ```
 
-Required variables:
-
-```bash
-# GitLab OAuth
-GITLAB_CLIENT_ID=your_gitlab_application_id
-GITLAB_CLIENT_SECRET=your_gitlab_secret
-
-# Google OAuth
-GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-
-# Database
-POSTGRES_PASSWORD=secret
-KRATOS_DSN=postgres://postgres:secret@postgres:5432/kratos?sslmode=disable
-APP_DATABASE_URL=postgres://postgres:secret@postgres:5432/app?sslmode=disable
-
-# Secrets (change in production)
-KRATOS_SECRETS_COOKIE=PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
-KRATOS_SECRETS_CIPHER=32-LONG-SECRET-NOT-SECURE-AT-ALL
-SESSION_SECRET=change-this-super-secret-session-key
-```
+Edit the file with your OAuth credentials. See [Environment Variables Reference](#environment-variables-reference) for detailed documentation.
 
 ## Quick Start
 
@@ -272,6 +251,150 @@ Visit http://127.0.0.1:4436 to see emails sent by Kratos (MailSlurper UI).
 4. Set proper cookie domain in `kratos/kratos.yml`
 5. Use managed PostgreSQL
 6. Enable SSL for database connections
+
+## Environment Variables Reference
+
+### Network Configuration
+
+| Variable | Description | Local | Production |
+|----------|-------------|-------|------------|
+| `DOMAIN` | Cookie domain for sessions | `127.0.0.1` | VM IP or domain |
+
+### Database
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `POSTGRES_USER` | PostgreSQL username | `postgres` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | `secret`  Change in production |
+| `POSTGRES_MULTIPLE_DATABASES` | Databases to create | `kratos,app` |
+| `KRATOS_DSN` | Kratos database connection | `postgres://user:pass@postgres:5432/kratos?sslmode=disable` |
+| `APP_DATABASE_URL` | App database connection | `postgres://user:pass@postgres:5432/app?sslmode=disable` |
+
+### Secrets
+
+ **CRITICAL**: Generate new random secrets for production!
+
+```bash
+# Generate secure secrets
+openssl rand -base64 32
+```
+
+| Variable | Description | Local | Production |
+|----------|-------------|-------|------------|
+| `KRATOS_SECRETS_COOKIE` | Kratos cookie encryption | Insecure placeholder | `openssl rand -base64 32` |
+| `KRATOS_SECRETS_CIPHER` | Kratos cipher key | Insecure placeholder | `openssl rand -base64 32` |
+| `SESSION_SECRET` | Express session secret | Insecure placeholder | `openssl rand -base64 32` |
+
+### OAuth Providers
+
+#### GitLab
+
+| Variable | Description |
+|----------|-------------|
+| `GITLAB_CLIENT_ID` | GitLab Application ID |
+| `GITLAB_CLIENT_SECRET` | GitLab Application Secret |
+
+**Redirect URIs:**
+- Local: `http://127.0.0.1:4433/self-service/methods/oidc/callback/gitlab`
+- Production: `http://YOUR_VM_IP:4433/self-service/methods/oidc/callback/gitlab`
+- HTTPS: `https://auth.yourdomain.com/self-service/methods/oidc/callback/gitlab`
+
+#### Google
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+
+**Redirect URIs:**
+- Local: `http://127.0.0.1:4433/self-service/methods/oidc/callback/google`
+- Production: `http://YOUR_VM_IP:4433/self-service/methods/oidc/callback/google`
+- HTTPS: `https://auth.yourdomain.com/self-service/methods/oidc/callback/google`
+
+### Service URLs
+
+#### Internal URLs (Docker Network)
+
+These remain the same for local and production:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `KRATOS_PUBLIC_URL_INTERNAL` | `http://kratos:4433` | Internal Kratos public API |
+| `KRATOS_ADMIN_URL_INTERNAL` | `http://kratos:4434` | Internal Kratos admin API |
+
+#### External URLs (Browser Access)
+
+**Local Development:**
+
+| Variable | Value |
+|----------|-------|
+| `KRATOS_BROWSER_URL` | `http://127.0.0.1:4433` |
+| `KRATOS_UI_URL` | `http://127.0.0.1:4455` |
+| `APP_URL` | `http://127.0.0.1:3000` |
+
+**Production (VM with External IP):**
+
+Replace `YOUR_VM_IP` with your VM's external IP (e.g., `203.0.113.45`):
+
+| Variable | Value |
+|----------|-------|
+| `KRATOS_BROWSER_URL` | `http://YOUR_VM_IP:4433` |
+| `KRATOS_UI_URL` | `http://YOUR_VM_IP:4455` |
+| `APP_URL` | `http://YOUR_VM_IP:3000` |
+| `DOMAIN` | `YOUR_VM_IP` |
+
+**Production (Domain with HTTPS - Recommended):**
+
+| Variable | Example |
+|----------|----------|
+| `KRATOS_BROWSER_URL` | `https://auth.yourdomain.com` |
+| `KRATOS_UI_URL` | `https://login.yourdomain.com` |
+| `APP_URL` | `https://app.yourdomain.com` |
+| `DOMAIN` | `yourdomain.com` |
+
+### Production Checklist
+
+- [ ] Update `DOMAIN` to your VM IP or domain
+- [ ] Generate new `KRATOS_SECRETS_COOKIE` using `openssl rand -base64 32`
+- [ ] Generate new `KRATOS_SECRETS_CIPHER` using `openssl rand -base64 32`
+- [ ] Generate new `SESSION_SECRET` using `openssl rand -base64 32`
+- [ ] Change `POSTGRES_PASSWORD` to a strong password
+- [ ] Update OAuth redirect URIs in GitLab/Google consoles with production URLs
+- [ ] Set external URLs (`KRATOS_BROWSER_URL`, `KRATOS_UI_URL`, `APP_URL`)
+- [ ] Use HTTPS in production (highly recommended)
+- [ ] Configure firewall to allow ports: `3000`, `4433`, `4434`, `4455`
+- [ ] Set up reverse proxy (nginx/Caddy) for HTTPS
+- [ ] Configure SSL certificates (Let's Encrypt recommended)
+
+### VM Deployment Example
+
+For a VM with external IP `203.0.113.45`:
+
+```bash
+# .env file
+DOMAIN=203.0.113.45
+
+# Secrets (generate new ones!)
+KRATOS_SECRETS_COOKIE=X8k2Jm9LpQzRn3+sT5vWdHgY7uJkMpTnVbXc2eRq1w=
+KRATOS_SECRETS_CIPHER=Y9l3Kn0MqRzSo4+tU6wXeIhZ8vKlNqUnWcYd3fSr2x=
+SESSION_SECRET=Z0m4Lo1NrSzTp5+uV7xYfJiA9wLmOrVoXdZe4gTt3y=
+POSTGRES_PASSWORD=your-strong-password-here
+
+# OAuth (update redirect URIs in consoles)
+GITLAB_CLIENT_ID=your_actual_gitlab_id
+GITLAB_CLIENT_SECRET=your_actual_gitlab_secret
+GOOGLE_CLIENT_ID=your_actual_google_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_actual_google_secret
+
+# External URLs
+KRATOS_BROWSER_URL=http://203.0.113.45:4433
+KRATOS_UI_URL=http://203.0.113.45:4455
+APP_URL=http://203.0.113.45:3000
+```
+
+Don't forget to update OAuth redirect URIs:
+- GitLab: `http://203.0.113.45:4433/self-service/methods/oidc/callback/gitlab`
+- Google: `http://203.0.113.45:4433/self-service/methods/oidc/callback/google`
 
 ## License
 

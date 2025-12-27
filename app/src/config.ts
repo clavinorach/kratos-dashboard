@@ -17,6 +17,6 @@ export const config = {
   sessionSecret: process.env.SESSION_SECRET || 'change-this-super-secret-session-key',
   
   // Kratos Self-Service UI
-  kratosUiUrl: 'http://127.0.0.1:4455',
+  kratosUiUrl: process.env.KRATOS_UI_URL || 'http://127.0.0.1:4455',
 };
 
